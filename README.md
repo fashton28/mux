@@ -99,5 +99,5 @@ Run the suite (requires [`bats`](https://github.com/bats-core/bats-core) and `sh
 
 ```sh
 bats tests/
-shellcheck -s bash mux
+shellcheck -s bash mux mux.tmux
 ```
