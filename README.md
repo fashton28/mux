@@ -8,13 +8,16 @@ of each. Press Enter to jump straight into a session; `ctrl-x` to kill one. The 
 itself like a dashboard.
 
 ```
-● waiting  ~/dev/api            2899m   │  <live preview of the
-● waiting  ~/dev/web             304m   │   highlighted session's
-● working  ~/dev/cli               0m   │   terminal screen>
-● idle     ~/dev/infra            12m   │
-○ ?        ~/dev/scratch          7m   │
+● waiting  work       ~/dev/api            2899m   │  <live preview of the
+● waiting  work       ~/dev/web             304m   │   highlighted session's
+● working  main       ~/dev/cli               0m   │   terminal screen>
+● idle     main       ~/dev/infra            12m   │
+○ ?        scratch    ~/dev/scratch          7m   │
 Claude sessions - j/k: move - J/K: scroll - enter: jump - ctrl-x: kill
 ```
+
+Each row shows the status, the **tmux session** the Claude session lives in, its working
+directory, and how long it has been in its current status.
 
 ## How it works
 
