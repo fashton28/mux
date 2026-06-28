@@ -89,6 +89,14 @@ pids() { awk -F'\t' '{print $NF}'; }
   printf '%s\n' "$output" | strip_ansi | grep -q '~/dev/alpha'
 }
 
+@test "shows the tmux session name column" {
+  run "$MUX" list
+  out=$(printf '%s\n' "$output" | strip_ansi)
+  # pid 100 (alpha) lives in tmux session 'main'; pid 103 (delta) in 'work'
+  printf '%s\n' "$out" | grep alpha | grep -q 'main'
+  printf '%s\n' "$out" | grep delta | grep -q 'work'
+}
+
 @test "empty sessions dir yields the placeholder, no session rows" {
   empty="$BATS_TEST_TMPDIR/empty"
   mkdir -p "$empty"

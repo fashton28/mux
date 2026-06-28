@@ -26,6 +26,7 @@ set -u
 SESSIONS_DIR="${MUX_SESSIONS_DIR:-$HOME/.claude/sessions}"
 NOW="${MUX_NOW:-$(date +%s)}"
 PATH_WIDTH=40
+SESSION_WIDTH=12
 
 # Canonical Claude status palette (24-bit RGB), rank for sorting, and label.
 status_rank() { case "$1" in waiting) echo 0;; busy) echo 1;; idle) echo 2;; *) echo 3;; esac; }
@@ -87,7 +88,7 @@ cmd_list() {
   PANES="$(load_panes)"
   local out f fields pid cwd status su upd kind
   local paneline sname win pane
-  local rank color label ts secs mins minstr sortmins dot disp visible
+  local rank color label ts secs mins minstr sortmins dot disp sdisp visible
 
   out=$(
     for f in "$SESSIONS_DIR"/*.json; do
@@ -121,8 +122,11 @@ EOF
       fi
 
       disp=$(abbrev_path "$cwd")
+      sdisp="$sname"
+      [ -n "$sdisp" ] || sdisp="-"
+      if [ "${#sdisp}" -gt "$SESSION_WIDTH" ]; then sdisp="${sdisp:0:$((SESSION_WIDTH - 1))}…"; fi
       dot=$(printf '\033[38;2;%sm●\033[0m' "$color")
-      visible=$(printf '%s %-8s %-*s %6s' "$dot" "$label" "$PATH_WIDTH" "$disp" "$minstr")
+      visible=$(printf '%s %-8s %-*s %-*s %6s' "$dot" "$label" "$SESSION_WIDTH" "$sdisp" "$PATH_WIDTH" "$disp" "$minstr")
 
       printf '%d	%d	%s	%s	%s	%s	%s\n' "$rank" "$sortmins" "$visible" "$pane" "$win" "$sname" "$pid"
     done | sort -t'	' -k1,1n -k2,2nr | cut -f3-
