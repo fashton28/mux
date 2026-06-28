@@ -15,7 +15,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y shellcheck bats jq
 
       - name: Shellcheck
-        run: shellcheck -s bash mux .claude/hooks/no-mistakes-gate.sh
+        run: shellcheck -s bash mux mux.tmux .claude/hooks/no-mistakes-gate.sh
 
       - name: Bats
         run: bats tests/
