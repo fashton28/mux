@@ -13,7 +13,7 @@ itself like a dashboard.
 ● working  ~/dev/cli               0m   │   terminal screen>
 ● idle     ~/dev/infra            12m   │
 ○ ?        ~/dev/scratch          7m   │
-Claude sessions - enter: jump - ctrl-x: kill
+Claude sessions - j/k: move - J/K: scroll - enter: jump - ctrl-x: kill
 ```
 
 ## How it works
@@ -65,8 +65,9 @@ Or skip tmux integration entirely and call the script directly (put `mux` on you
 | Key | Action |
 |-----|--------|
 | j / k | move selection down / up (vim) |
+| J / K | scroll the preview pane down / up (shift) |
 | ↑ / ↓ | move selection (preview follows) |
-| type | fuzzy-filter the list (other letters; j/k are navigation) |
+| type | fuzzy-filter the list (other letters; j/k/J/K are navigation) |
 | Enter | jump to the selected session and close the overlay |
 | ctrl-x | SIGTERM the selected session (its pane stays, drops to a shell) |
 | Esc | close the overlay |

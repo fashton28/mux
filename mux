@@ -185,12 +185,16 @@ cmd_launch() {
   check_deps
   local self
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  # Vim-style motion (deliberate: these keys stop typing into the fuzzy filter,
+  # every other key still filters). j/k move the list; J/K (shift) scroll the
+  # preview. Arrows and fzf's default ctrl-j/ctrl-k still move the selection too.
   fzf --ansi --no-sort --track \
     --delimiter='	' --with-nth=1 \
-    --header 'Claude sessions - j/k: move - enter: jump - ctrl-x: kill' \
+    --header 'Claude sessions - j/k: move - J/K: scroll - enter: jump - ctrl-x: kill' \
     --preview "$self preview {2}" \
     --preview-window=right:60% \
     --bind 'j:down,k:up' \
+    --bind 'J:preview-down,K:preview-up' \
     --bind "start:reload($self list)" \
     --bind "load:reload(sleep 2; $self list)" \
     --bind "ctrl-x:execute-silent($self kill {5})+reload($self list)" \
