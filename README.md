@@ -1,5 +1,7 @@
 # mux
 
+![mux - a Claude Code session manager in your terminal](public/mux-preview.png)
+
 **A Claude Code session manager that lives in your terminal.**
 
 Running several Claude Code sessions across tmux panes and windows? `mux` shows them all in one
