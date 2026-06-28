@@ -33,19 +33,32 @@ terminal scraping - status comes straight from that file.
 
 ## Install
 
-1. Put `mux` on your `PATH` (it is a single self-contained script):
+### With [TPM](https://github.com/tmux-plugins/tpm) (recommended)
 
-   ```sh
-   ln -s "$PWD/mux" /usr/local/bin/mux   # or copy it anywhere on PATH
-   ```
+Add this line to your `~/.tmux.conf`:
 
-2. Add the keybinding to your `~/.tmux.conf` and reload (`tmux source-file ~/.tmux.conf`):
+```tmux
+set -g @plugin 'fashton28/mux'
+```
 
-   ```tmux
-   bind-key C display-popup -E -w 90% -h 90% 'mux'
-   ```
+Then press `prefix + I` to fetch the plugin. That's it - press **`prefix + u`** to open the overlay.
 
-   Now `prefix + C` (capital C) opens the overlay over any tab.
+Want a different key? Set it before the `run '.../tpm'` line:
+
+```tmux
+set -g @mux-key 'C'   # default is 'u'
+```
+
+### Without TPM
+
+`mux` is a single self-contained script - clone the repo and source the plugin file from your
+`~/.tmux.conf`:
+
+```tmux
+run-shell '~/path/to/mux/mux.tmux'
+```
+
+Or skip tmux integration entirely and call the script directly (put `mux` on your `PATH`).
 
 ## Usage
 

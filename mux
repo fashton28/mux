@@ -4,9 +4,8 @@
 #
 # Lists every live Claude Code session on the current tmux server in an fzf
 # overlay, sorted so the sessions waiting on you float to the top, with a live
-# preview. Enter jumps to a session; ctrl-x kills one. Bind it in tmux.conf:
-#
-#   bind-key C display-popup -E -w 90% -h 90% 'mux'
+# preview. Enter jumps to a session; ctrl-x kills one. Install via TPM
+# (set -g @plugin 'fashton28/mux') and open it with prefix + u; see mux.tmux.
 #
 # Source of truth: ~/.claude/sessions/<pid>.json (written by Claude Code).
 # No terminal scraping - status comes straight from the `status` field.
