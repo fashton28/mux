@@ -187,9 +187,10 @@ cmd_launch() {
   self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
   fzf --ansi --no-sort --track \
     --delimiter='	' --with-nth=1 \
-    --header 'Claude sessions - enter: jump - ctrl-x: kill' \
+    --header 'Claude sessions - j/k: move - enter: jump - ctrl-x: kill' \
     --preview "$self preview {2}" \
     --preview-window=right:60% \
+    --bind 'j:down,k:up' \
     --bind "start:reload($self list)" \
     --bind "load:reload(sleep 2; $self list)" \
     --bind "ctrl-x:execute-silent($self kill {5})+reload($self list)" \
