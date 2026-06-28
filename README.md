@@ -13,7 +13,7 @@ itself like a dashboard.
 ● working  ~/dev/cli               0m   │   terminal screen>
 ● idle     ~/dev/infra            12m   │
 ○ ?        ~/dev/scratch          7m   │
-Claude sessions - enter: jump - ctrl-x: kill
+Claude sessions - j/k: move - J/K: scroll - enter: jump - ctrl-x: kill
 ```
 
 ## How it works
