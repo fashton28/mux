@@ -1,11 +1,10 @@
 # mux
 
-A Claude Code session manager right inside your terminal.
+**A Claude Code session manager that lives in your terminal.**
 
-`mux` shows every live Claude Code session running on your current tmux server in a floating
-`fzf` overlay - sorted so the sessions **waiting on you** float to the top - with a live preview
-of each. Press Enter to jump straight into a session; `ctrl-x` to kill one. The list refreshes
-itself like a dashboard.
+Running several Claude Code sessions across tmux panes and windows? `mux` shows them all in one
+floating overlay - sorted so the sessions **waiting on you** rise to the top - so you always know
+which one needs attention and how long it has been stuck. Pick one and you jump straight to it.
 
 ```
 ● waiting  work       ~/dev/api            2899m   │  <live preview of the
@@ -16,81 +15,166 @@ itself like a dashboard.
 Claude sessions - j/k: move - J/K: scroll - enter: jump - ctrl-x: kill
 ```
 
-Each row shows the status, the **tmux session** the Claude session lives in, its working
-directory, and how long it has been in its current status.
+Each row shows, left to right: a **status** dot/label, the **tmux session** the Claude session
+runs in, its **working directory**, and how long it has been in its current status. The pane on the
+right is a live preview of the highlighted session's screen.
 
-## How it works
+- **Find the blocked one instantly** - sessions waiting for your input are colored and sorted first.
+- **Jump in one keypress** - `Enter` takes you straight to that session's pane, even across windows.
+- **No setup per session** - it reads Claude Code's own status files; nothing to configure or wrap.
+- **Live** - the list and timers refresh on their own while the overlay is open.
 
-Claude Code writes a status file per running process at `~/.claude/sessions/<pid>.json` containing
-the session's `cwd`, `kind`, and a live `status` (`waiting` / `busy` / `idle`). `mux` reads those
-files, keeps the interactive sessions (not sub-agents) whose process is still alive and whose pane
-lives on your current tmux server, and renders them with Claude's own status colors. There is no
-terminal scraping - status comes straight from that file.
+---
 
 ## Requirements
 
-- `tmux`
-- `fzf` **>= 0.38** (needs `become`, `reload`, `--track`)
-- `jq`
-- `bash`, `ps` (the script runs on macOS's stock bash 3.2)
+| Tool | Version | Notes |
+|------|---------|-------|
+| [`tmux`](https://github.com/tmux/tmux) | any recent | mux is a tmux overlay |
+| [`fzf`](https://github.com/junegunn/fzf) | **≥ 0.38** | needs `become`, `reload`, `--track` |
+| [`jq`](https://jqlang.github.io/jq/) | any | reads the session JSON |
+| `bash`, `ps` | preinstalled | runs on macOS's stock bash 3.2 and on Linux |
 
-## Install
+Install the three tools with your package manager, e.g. `brew install tmux fzf jq` (macOS) or
+`sudo apt install tmux fzf jq` (Debian/Ubuntu).
 
-### With [TPM](https://github.com/tmux-plugins/tpm) (recommended)
+> Throughout this README, **`prefix`** means your tmux prefix key - `Ctrl-b` by default. So
+> "`prefix + u`" means press `Ctrl-b`, release, then press `u`.
 
-Add this line to your `~/.tmux.conf`:
+---
 
-```tmux
-set -g @plugin 'fashton28/mux'
-```
+## Installation
 
-Then press `prefix + I` to fetch the plugin. That's it - press **`prefix + u`** to open the overlay.
+### Recommended: with TPM
 
-Want a different key? Set it before the `run '.../tpm'` line:
+[TPM](https://github.com/tmux-plugins/tpm) (the Tmux Plugin Manager) is the easiest way to install
+and keep mux updated.
 
-```tmux
-set -g @mux-key 'C'   # default is 'u'
-```
+1. **Install TPM** (skip if you already have it):
+
+   ```sh
+   git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+   ```
+
+2. **Add mux to your `~/.tmux.conf`.** Put the plugin lines near the bottom, and keep the TPM
+   `run` line as the very last line:
+
+   ```tmux
+   set -g @plugin 'tmux-plugins/tpm'
+   set -g @plugin 'fashton28/mux'
+
+   run '~/.tmux/plugins/tpm/tpm'   # keep this last
+   ```
+
+3. **Reload tmux and fetch the plugin.** From inside tmux, reload the config:
+
+   ```sh
+   tmux source-file ~/.tmux.conf
+   ```
+
+   then press **`prefix + I`** (capital `I`) to download mux.
+
+That's it. Press **`prefix + u`** to open the overlay.
 
 ### Without TPM
 
-`mux` is a single self-contained script - clone the repo and source the plugin file from your
+`mux` is a single self-contained script. Clone the repo and source its tmux entrypoint from your
 `~/.tmux.conf`:
 
-```tmux
-run-shell '~/path/to/mux/mux.tmux'
+```sh
+git clone https://github.com/fashton28/mux ~/.tmux/plugins/mux
 ```
 
-Or skip tmux integration entirely and call the script directly (put `mux` on your `PATH`).
+```tmux
+run-shell '~/.tmux/plugins/mux/mux.tmux'
+```
 
-## Usage
+Reload (`tmux source-file ~/.tmux.conf`) and press **`prefix + u`**.
+
+Prefer no tmux integration at all? The `mux` script works on its own - put it on your `PATH`
+(`ln -s "$PWD/mux" /usr/local/bin/mux`) and bind it yourself, or just run `mux list`.
+
+---
+
+## Getting started
+
+1. Start a few Claude Code sessions inside tmux - run `claude` in separate panes or windows.
+2. Press **`prefix + u`** from any tab. The overlay floats over your screen.
+3. Move through the list, watch the preview, and `Enter` to jump into a session.
+
+mux only lists Claude sessions on **your current tmux server** (so every row is one you can jump
+to). Sessions running outside tmux, in another tmux server, or already finished are not shown.
+
+---
+
+## Keybindings
 
 | Key | Action |
 |-----|--------|
-| j / k | move selection down / up (vim) |
-| J / K | scroll the preview pane down / up (shift) |
-| ↑ / ↓ | move selection (preview follows) |
-| type | fuzzy-filter the list (other letters; j/k/J/K are navigation) |
-| Enter | jump to the selected session and close the overlay |
-| ctrl-x | SIGTERM the selected session (its pane stays, drops to a shell) |
-| Esc | close the overlay |
+| `j` / `k` | move selection down / up (vim) |
+| `J` / `K` | scroll the preview pane down / up (Shift) |
+| `↑` / `↓` | move selection (preview follows) |
+| `Enter` | jump to the selected session and close the overlay |
+| `ctrl-x` | terminate the selected session (SIGTERM; its pane stays, drops to a shell) |
+| `Esc` | close the overlay |
+| _type_ | fuzzy-filter the list (any key except the navigation keys `j k J K`) |
 
-Sessions are sorted `waiting` → `working` → `idle` → `?`, and within each group the one that has
-been in its status longest is shown first. The minutes column is time since the last status change.
+### Status legend
 
-You can also run the subcommands directly:
+| Dot | Status | Meaning |
+|-----|--------|---------|
+| 🔵 | `waiting` | the session needs your input - **deal with these first** |
+| 🟠 | `working` | actively running |
+| 🟢 | `idle` | finished and ready |
+| ⚪ | `?` | status could not be determined |
+
+Rows are sorted `waiting → working → idle → ?`, and within each group the session that has been in
+its status **longest** appears first - so a session that has been waiting on you for hours floats
+to the very top. The right-hand number is minutes since the status last changed.
+
+---
+
+## Configuration
+
+Set these tmux options **before** the TPM `run` line in `~/.tmux.conf`:
+
+```tmux
+set -g @mux-key 'C'   # which prefix key opens mux (default: 'u')
+```
+
+---
+
+## Command-line usage
+
+The overlay is the main interface, but the script exposes subcommands directly:
 
 ```sh
-mux list                          # the formatted session list
-mux preview <pane>                # a pane's live screen
-mux jump <pane> <window> <session>
-mux kill <pid>                    # SIGTERM a Claude session (guarded)
+mux                                   # launch the fzf overlay (what the keybinding runs)
+mux list                              # print the formatted session list
+mux preview <pane>                    # print a tmux pane's live screen
+mux jump <pane> <window> <session>    # switch to a session's pane
+mux kill <pid>                        # SIGTERM a Claude session (guarded)
 ```
+
+---
+
+## Troubleshooting
+
+- **`prefix + u` does nothing.** Make sure the config reloaded (`tmux source-file ~/.tmux.conf`) and,
+  for TPM, that you pressed `prefix + I`. Check the key isn't already bound: `tmux list-keys | grep ' u '`.
+- **The overlay opens but the list is empty.** mux only shows live Claude sessions on the current
+  tmux server. Start `claude` inside a tmux pane, or check you're attached to the right server.
+- **`mux: fzf >= 0.38 required`.** Upgrade fzf (`brew upgrade fzf`, or grab a release from the
+  [fzf repo](https://github.com/junegunn/fzf/releases)).
+- **`u` collides with another binding.** Pick a different key with `set -g @mux-key '...'`.
+
+---
 
 ## Development
 
-The session-listing logic lives behind one test seam: `mux list` reads its external inputs from
-environment variables, so it is a pure, deterministic function for testing:
+The session-listing logic sits behind a single test seam: `mux list` reads its external inputs from
+environment variables, making it a pure, deterministic function you can drive with fixtures - no live
+tmux server or real Claude processes required.
 
 ```sh
 MUX_SESSIONS_DIR=tests/fixtures/sessions \
@@ -100,7 +184,7 @@ MUX_NOW=1782657704 \
   mux list
 ```
 
-Run the suite (requires [`bats`](https://github.com/bats-core/bats-core) and `shellcheck`):
+Run the checks (needs [`bats`](https://github.com/bats-core/bats-core) and `shellcheck`):
 
 ```sh
 bats tests/
