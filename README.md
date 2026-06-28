@@ -19,9 +19,10 @@ Claude sessions - enter: jump - ctrl-x: kill
 ## How it works
 
 Claude Code writes a status file per running process at `~/.claude/sessions/<pid>.json` containing
-the session's `cwd`, `sessionId`, and a live `status` (`waiting` / `busy` / `idle`). `mux` reads
-those files, keeps the sessions whose pane lives on your current tmux server, and renders them with
-Claude's own status colors. There is no terminal scraping - status comes straight from that file.
+the session's `cwd`, `kind`, and a live `status` (`waiting` / `busy` / `idle`). `mux` reads those
+files, keeps the interactive sessions (not sub-agents) whose process is still alive and whose pane
+lives on your current tmux server, and renders them with Claude's own status colors. There is no
+terminal scraping - status comes straight from that file.
 
 ## Requirements
 
