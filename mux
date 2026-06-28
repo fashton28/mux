@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+#
+# mux - a Claude Code session manager in your terminal.
+#
+# Lists every live Claude Code session on the current tmux server in an fzf
+# overlay, sorted so the sessions waiting on you float to the top, with a live
+# preview. Enter jumps to a session; ctrl-x kills one. Bind it in tmux.conf:
+#
+#   bind-key C display-popup -E -w 90% -h 90% 'mux'
+#
+# Source of truth: ~/.claude/sessions/<pid>.json (written by Claude Code).
+# No terminal scraping - status comes straight from the `status` field.
+#
+# Written to run on macOS's stock bash 3.2 (no associative arrays / mapfile).
+#
+# Test seam: `mux list` is a pure function of three injectable inputs -
+#   MUX_SESSIONS_DIR  dir of <pid>.json files (default ~/.claude/sessions)
+#   MUX_PANES_FILE    captured `tmux list-panes -a` output (default: live tmux)
+#   MUX_NOW           frozen epoch seconds for the minutes column (default: now)
+#   MUX_PPID_FILE     "pid ppid" lines for the ancestry walk (default: live ps)
+#   MUX_KILL_DRY_RUN  if set, `mux kill` prints instead of signalling
+
+set -u
+
+# --- configuration / seam -----------------------------------------------------
+
+SESSIONS_DIR="${MUX_SESSIONS_DIR:-$HOME/.claude/sessions}"
+NOW="${MUX_NOW:-$(date +%s)}"
+PATH_WIDTH=40
+
+# Canonical Claude status palette (24-bit RGB), rank for sorting, and label.
+status_rank() { case "$1" in waiting) echo 0;; busy) echo 1;; idle) echo 2;; *) echo 3;; esac; }
+status_color() { case "$1" in waiting) echo "95;135;255";; busy) echo "255;149;0";; idle) echo "0;215;95";; *) echo "136;136;136";; esac; }
+status_label() { case "$1" in waiting) echo "waiting";; busy) echo "working";; idle) echo "idle";; *) echo "?";; esac; }
+
+# --- helpers ------------------------------------------------------------------
+
+# Parent pid of $1 - from the fixture map in test mode, else live ps.
+get_ppid() {
+  if [ -n "${MUX_PPID_FILE:-}" ]; then
+    awk -v p="$1" '$1==p { print $2; exit }' "$MUX_PPID_FILE"
+  else
+    ps -o ppid= -p "$1" 2>/dev/null | tr -d ' '
+  fi
+}
+
+# A pid is "alive" if we trust the fixture map, else if the OS says so.
+pid_alive() {
+  if [ -n "${MUX_PPID_FILE:-}" ]; then return 0; fi
+  kill -0 "$1" 2>/dev/null
+}
+
+# The pane table for the current tmux server (pane_pid, session, window, pane, path).
+load_panes() {
+  if [ -n "${MUX_PANES_FILE:-}" ]; then
+    cat "$MUX_PANES_FILE"
+  else
+    tmux list-panes -a -F '#{pane_pid}	#{session_name}	#{window_id}	#{pane_id}	#{pane_current_path}' 2>/dev/null
+  fi
+}
+
+# Walk a pid's ancestry until it reaches a pane on this server.
+# Prints the matching pane line (tab-separated) and returns 0, else returns 1.
+resolve_pane() {
+  local cur="$1" depth=0 line
+  while [ -n "$cur" ] && [ "$cur" -gt 1 ] 2>/dev/null && [ "$depth" -lt 30 ]; do
+    line=$(printf '%s\n' "$PANES" | awk -F'	' -v p="$cur" '$1==p { print; exit }')
+    if [ -n "$line" ]; then printf '%s' "$line"; return 0; fi
+    cur=$(get_ppid "$cur")
+    depth=$((depth + 1))
+  done
+  return 1
+}
+
+# Abbreviate $HOME to ~ and left-truncate to PATH_WIDTH (keeping the tail).
+abbrev_path() {
+  local p="$1"
+  case "$p" in "$HOME"*) p="~${p#"$HOME"}";; esac
+  if [ "${#p}" -gt "$PATH_WIDTH" ]; then
+    p="…${p: -$((PATH_WIDTH - 1))}"
+  fi
+  printf '%s' "$p"
+}
+
+# --- subcommands --------------------------------------------------------------
+
+cmd_list() {
+  PANES="$(load_panes)"
+  local out f fields pid cwd status su upd kind
+  local paneline sname win pane
+  local rank color label ts secs mins minstr sortmins dot disp visible
+
+  out=$(
+    for f in "$SESSIONS_DIR"/*.json; do
+      [ -e "$f" ] || continue
+      fields=$(jq -r '[(.pid|tostring),(.cwd//""),(.status//""),(.statusUpdatedAt|tostring),(.updatedAt|tostring),(.kind//"")] | join("\u001f")' "$f" 2>/dev/null) || continue
+      IFS=$'\x1f' read -r pid cwd status su upd kind <<EOF
+$fields
+EOF
+      [ -n "$pid" ] && [ "$pid" != "null" ] || continue
+      [ "$kind" = "interactive" ] || continue
+      pid_alive "$pid" || continue
+      paneline=$(resolve_pane "$pid") || continue
+      IFS='	' read -r _ sname win pane _ <<EOF
+$paneline
+EOF
+
+      rank=$(status_rank "$status")
+      color=$(status_color "$status")
+      label=$(status_label "$status")
+
+      ts="$su"; [ -n "$ts" ] && [ "$ts" != "null" ] || ts="$upd"
+      if [ -n "$ts" ] && [ "$ts" != "null" ] && printf '%s' "$ts" | grep -Eq '^[0-9]+$'; then
+        secs=$((ts / 1000))
+        mins=$(((NOW - secs) / 60))
+        [ "$mins" -lt 0 ] && mins=0
+        minstr="${mins}m"
+        sortmins=$mins
+      else
+        minstr="?"
+        sortmins=-1
+      fi
+
+      disp=$(abbrev_path "$cwd")
+      dot=$(printf '\033[38;2;%sm●\033[0m' "$color")
+      visible=$(printf '%s %-8s %-*s %6s' "$dot" "$label" "$PATH_WIDTH" "$disp" "$minstr")
+
+      printf '%d	%d	%s	%s	%s	%s	%s\n' "$rank" "$sortmins" "$visible" "$pane" "$win" "$sname" "$pid"
+    done | sort -t'	' -k1,1n -k2,2nr | cut -f3-
+  )
+
+  if [ -z "$out" ]; then
+    printf '  no live Claude sessions\n'
+  else
+    printf '%s\n' "$out"
+  fi
+}
+
+cmd_preview() {
+  local pane="${1:-}"
+  [ -n "$pane" ] || exit 0
+  tmux capture-pane -p -e -t "$pane" 2>/dev/null || true
+}
+
+cmd_jump() {
+  local pane="${1:-}" win="${2:-}" sname="${3:-}"
+  [ -n "$pane" ] || exit 0
+  [ -n "$sname" ] && tmux switch-client -t "$sname" 2>/dev/null || true
+  [ -n "$win" ] && tmux select-window -t "$win" 2>/dev/null || true
+  tmux select-pane -t "$pane" 2>/dev/null || true
+}
+
+cmd_kill() {
+  local pid="${1:-}" f kind
+  printf '%s' "$pid" | grep -Eq '^[0-9]+$' || { echo "mux: invalid pid: '$pid'" >&2; exit 1; }
+  f="$SESSIONS_DIR/$pid.json"
+  [ -f "$f" ] || { echo "mux: $pid is not a known Claude session" >&2; exit 1; }
+  kind=$(jq -r '.kind//""' "$f" 2>/dev/null)
+  [ "$kind" = "interactive" ] || { echo "mux: $pid is not an interactive Claude session" >&2; exit 1; }
+  pid_alive "$pid" || { echo "mux: $pid is not alive" >&2; exit 1; }
+  if [ -n "${MUX_KILL_DRY_RUN:-}" ]; then
+    echo "would SIGTERM $pid"
+  else
+    kill "$pid"
+  fi
+}
+
+check_deps() {
+  local c missing="" v major rest minor
+  for c in fzf jq tmux; do
+    command -v "$c" >/dev/null 2>&1 || missing="$missing $c"
+  done
+  if [ -n "$missing" ]; then
+    echo "mux: missing required dependencies:$missing" >&2
+    exit 1
+  fi
+  v=$(fzf --version 2>/dev/null | awk '{print $1}')
+  major=${v%%.*}; rest=${v#*.}; minor=${rest%%.*}
+  if [ "${major:-0}" -eq 0 ] && [ "${minor:-0}" -lt 38 ] 2>/dev/null; then
+    echo "mux: fzf >= 0.38 required (found $v)" >&2
+    exit 1
+  fi
+}
+
+cmd_launch() {
+  check_deps
+  local self
+  self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
+  fzf --ansi --no-sort --track \
+    --delimiter='	' --with-nth=1 \
+    --header 'Claude sessions - enter: jump - ctrl-x: kill' \
+    --preview "$self preview {2}" \
+    --preview-window=right:60% \
+    --bind "start:reload($self list)" \
+    --bind "load:reload(sleep 2; $self list)" \
+    --bind "ctrl-x:execute-silent($self kill {5})+reload($self list)" \
+    --bind "enter:become($self jump {2} {3} {4})" \
+    </dev/null
+}
+
+usage() {
+  cat >&2 <<'USAGE'
+mux - Claude Code session manager
+
+Usage:
+  mux                       launch the fzf overlay (bind this in tmux.conf)
+  mux list                  print the formatted session list
+  mux preview <pane>        print a pane's live screen
+  mux jump <pane> <win> <session>
+  mux kill <pid>            SIGTERM a Claude session (pane is left intact)
+USAGE
+}
+
+# --- dispatch -----------------------------------------------------------------
+
+case "${1:-}" in
+  list)    shift; cmd_list "$@" ;;
+  preview) shift; cmd_preview "$@" ;;
+  jump)    shift; cmd_jump "$@" ;;
+  kill)    shift; cmd_kill "$@" ;;
+  ""|launch) cmd_launch ;;
+  -h|--help|help) usage ;;
+  *) usage; exit 2 ;;
+esac

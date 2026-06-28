@@ -1,0 +1,5 @@
+900	main	@0	%0	/home/tester/dev/alpha
+901	main	@1	%1	/home/tester/dev/bravo
+902	work	@2	%2	/home/tester/dev/charlie
+903	work	@3	%3	/home/tester/dev/delta
+905	main	@5	%5	/home/tester/dev/foxtrot
