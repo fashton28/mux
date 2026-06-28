@@ -1,6 +1,6 @@
 # mux
 
-![mux - a Claude Code session manager in your terminal](public/image.png)
+![mux - a Claude Code session manager in your terminal](public/Img.png)
 
 **A Claude Code session manager that lives in your terminal.**
 
